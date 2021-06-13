@@ -66,12 +66,34 @@ def _strerr_print(*args):
 
 class AppDriver:
     """QApplication + WebDriver"""
+    _excep = None
 
     def __init__(self, headless=True, logger=False):
         QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
         # QCoreApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
         self._app = QApplication(sys.argv)
         self.driver = WebDriver(headless, logger)
+
+    def run(self, f:callable) -> int:
+        """
+        Call f(driver) then use quit()
+        """
+        timer = QTimer()
+        timer.timeout.connect(lambda: self._run(f))
+        timer.setSingleShot(True)
+        timer.start(0)
+        r = self._app.exec_()
+        if self._excep:
+            raise self._excep
+        return r
+
+    def _run(self, f):
+        try:
+            f(self.driver)
+        except Exception as e:
+            self._excep = e
+        finally:
+            self.quit()
 
     def exec_(self) -> int:
         return self._app.exec_()
@@ -162,7 +184,7 @@ class WebDriver:
         """
         self.log(_LOG_CAT, 'init interceptor:', interceptor)
         self._interceptor.interceptor = interceptor
-        self._profile.set_UrlRequestInterceptor(self._interceptor)
+        self._profile.setUrlRequestInterceptor(self._interceptor)
 
     def get(self, url:str) -> None:
         """Open a url"""

@@ -15,7 +15,7 @@ from PySide2.QtCore import (QObject,
                             Qt)
 from PySide2.QtGui import QImage
 
-from . import webdriver
+from qwebdriver import webdriver
 
 
 _LOG_CAT = '\x1b[34m[idriver]\x1b[0m'
@@ -283,6 +283,14 @@ class AppDriver:
                                             interceptor_chann1,
                                             _select_logger(idebug))
         atexit.register(lambda: self.quit())
+
+    def run(self, f:callable) -> int:
+        try:
+            f(self.driver)
+            return 0
+        finally:
+            if self.p.is_alive():
+                self.quit()
 
     def quit(self):
         self.driver.quit()

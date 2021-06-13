@@ -2,4 +2,6 @@
 
 It supports script execution and screenshot taking.
 
-For technical reasons related to the Qt event loop, a python interpetor should use `iqwebdriver` with `python -m qwebdriver.iwebdriver`.
+For technical reasons related to the Qt event loop, a python interpretor should use `iwebdriver`.
+
+It is possible to start an interactive driver with `python -m qwebdriver.iwebdriver` (use `--help` for more options).
