@@ -260,12 +260,12 @@ class WebDriver:
             separated by a time limit are identical or when max_iter is reached.
         :param max_iter: maximum number of iterations used with frozen_after_ms.
         """
-        self.log(_LOG_CAT, 'grap:', (x, y, w, h), 'delay:', frozen_after_ms, 'max_iter:', max_iter)
+        self.log(_LOG_CAT, 'grab:', (x, y, w, h), 'delay:', frozen_after_ms, 'max_iter:', max_iter)
 
-        page_width, page_height, scroll_top, screen_h = self.execute_script(
+        page_width, page_height, scroll_top, screen_h, scroll_left = self.execute_script(
             f'''
             e = document.documentElement;
-            return [e.scrollWidth, e.scrollHeight, e.scrollTop, e.clientHeight];''')
+            return [e.scrollWidth, e.scrollHeight, e.scrollTop, e.clientHeight, window.scrollX];''')
         # shrink w/h compared to page_width/page_height
         w = page_width      if w < 0 else min(w, page_width-x)
         h = page_height - y if h < 0 else min(h, page_height-y)
@@ -303,12 +303,14 @@ class WebDriver:
 
             self.sleep_ms(200)
             if y != scroll_top:
-                self.execute_script(f'e.scrollTop = {y}')
-                self.sleep_ms(50)
+                self.execute_script(f'window.scroll({scroll_left}, {y})')
+                self.sleep_ms(50 + h//1000 * 20)
 
             rect = QRect(x, 0, w, h)
         else:
             rect = QRect(x, y - scroll_top, w, h)
+
+        self.log(_LOG_CAT, 'computed rect:', rect)
 
         img1 = view.grab(rect).toImage()
         if frozen_after_ms:
@@ -326,7 +328,7 @@ class WebDriver:
             else:
                 view.resize(old_size)
 
-            self.execute_script(f'document.documentElement.scrollTop = {scroll_top}')
+            self.execute_script(f'window.scroll({scroll_left}, {scroll_top})')
 
             self.sleep_ms(200)
 
