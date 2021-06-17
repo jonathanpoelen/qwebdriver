@@ -122,11 +122,11 @@ class _Synchronizer(QObject):
                 self.driver_chann.send((True, None))
             elif method == 'grab':
                 args = self.driver_messager.data[1]
-                pixmap = getattr(self.driver, method)(*args)
-                img = pixmap.toImage()
+                img:QImage = getattr(self.driver, method)(*args)
                 bits = img.constBits().tobytes()
                 format = img.format()
                 bytesPerLine = img.bytesPerLine()
+                # TODO: support of large image (more 32Mo)
                 result = (bits, img.width(), img.height(), bytesPerLine, int(format))
                 self.driver_chann.send((True, result))
             else:
@@ -134,6 +134,7 @@ class _Synchronizer(QObject):
                 result = getattr(self.driver, method)(*args)
                 self.driver_chann.send((True, result))
         except Exception as ex:
+            traceback.print_exc()
             self.driver_chann.send((False, type(ex).__name__, ex.args))
 
     def _interceptor(self, url):
@@ -168,6 +169,7 @@ class _InteractiveWebDriver:
     """
 
     _interceptor_thread = None
+    _depth = 0
 
     def __init__(self, driver_chann, interceptor_chann, interceptor_chann_recv, logger):
         self.log = logger
@@ -220,7 +222,10 @@ class _InteractiveWebDriver:
 
     def grab(self, x=0, y=0, w=-1, h=-1, frozen_after_ms=0, max_iter=10) -> QImage:
         d = self._exec('grab', (x,y,w,h,frozen_after_ms,max_iter,))
-        return QImage(d[0], d[1], d[2], d[3], QImage.Format(d[4]))
+        # copy for detached buffer
+        img = QImage(d[0], d[1], d[2], d[3], QImage.Format(d[4]))
+        img.convertTo(QImage.Format_RGB32)
+        return img
 
     def take_screenshot(self, filename:str, format:Optional[str]=None, quality:int=-1,
                         x=0, y=0, w=-1, h=-1, frozen_after_ms=0, max_iter=10) -> bool:
@@ -240,15 +245,25 @@ class _InteractiveWebDriver:
         return self._exec('enable_devtools', (enable,))
 
     def _exec(self, mem, data=()):
-        self.log(_LOG_CAT, 'exec:', mem, data)
+        logsep = ' ' if self._depth else ''
+        self.log(_LOG_CAT, f'{"":>>{self._depth}}{logsep}exec:', mem, data)
 
+        self._depth += 1
         self._driver_chann.send((mem, data))
         res = self._driver_chann.recv()
-        self.log(_LOG_CAT, 'result:', res)
+        self._depth -= 1
 
+        logprefix = f'{"":><{self._depth}}{logsep}'
+        if mem == 'grab':
+            self.log(_LOG_CAT, logprefix, mem, 'img.len=', len(res[1][0]), res[1][1:])
+        else:
+            self.log(_LOG_CAT, logprefix, mem, res)
+
+        # is not an exception
         if res[0]:
             return res[1]
 
+        # rebuild exception
         names = res[1].rsplit('.', 1)
         if len(names) == 1:
             class_name = names[0]
