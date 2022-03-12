@@ -1,6 +1,6 @@
 import sys
 import json
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 
 from PySide2.QtWebEngineCore import QWebEngineUrlRequestInterceptor
 from PySide2.QtWebEngineWidgets import (QWebEngineDownloadItem,
@@ -21,12 +21,13 @@ from PySide2.QtGui import QImage
 
 _LOG_CAT = '\x1b[33m[driver]\x1b[0m'
 
+
 class _UrlRequestInterceptor(QWebEngineUrlRequestInterceptor):
     """Wrapper to use a function with QWebEngineProfile::set_url_request_interceptor()"""
 
-    interceptor:Optional[callable] = None
+    interceptor: Optional[Callable[[str], bool]] = None
 
-    def __init__(self, log:callable):
+    def __init__(self, log: Callable[[str], bool]):
         super().__init__()
         self.log = log
 
@@ -44,6 +45,7 @@ class _WebPage(QWebEnginePage):
 
     js_error = None
     js_trace = False
+
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
         if self.js_trace:
             # TODO check sourceID
@@ -55,26 +57,29 @@ class _WebPage(QWebEnginePage):
 class JsException(Exception):
     pass
 
+
 def _null_fn(*args):
     """A function that does nothing (used when logger is None)"""
     pass
+
 
 def _strerr_print(*args):
     """print on stderr"""
     print(*args, file=sys.stderr)
     pass
 
+
 class AppDriver:
     """QApplication + WebDriver"""
     _excep = None
 
-    def __init__(self, headless=True, logger=False):
+    def __init__(self, headless: bool = True, logger: bool = False):
         QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
         # QCoreApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
         self._app = QApplication(sys.argv)
-        self.driver = WebDriver(headless, logger)
+        self.driver = WebDriver(headless, _strerr_print if logger else _null_fn)
 
-    def run(self, f:callable) -> int:
+    def run(self, f: Callable[['WebDriver'], None]) -> int:
         """
         Call f(driver) then use quit()
         """
@@ -98,7 +103,7 @@ class AppDriver:
     def exec_(self) -> int:
         return self._app.exec_()
 
-    def quit(self):
+    def quit(self) -> None:
         self.driver.quit()
         self._app.quit()
 
@@ -116,8 +121,8 @@ class WebDriver:
     _dev_view = None
     _headless_view = None
 
-    def __init__(self, headless:bool=True, logger:Union[callable,bool,None]=False):
-        if logger == True:
+    def __init__(self, headless: bool = True, logger: Union[Callable[..., None], bool, None] = False):
+        if logger is True:
             self.log = _strerr_print
         elif logger:
             self.log = logger
@@ -177,7 +182,7 @@ class WebDriver:
         self._profile.deleteLater()
         self._page = None
 
-    def set_url_request_interceptor(self, interceptor:Optional[callable]) -> None:
+    def set_url_request_interceptor(self, interceptor: Optional[Callable[[str], bool]]) -> None:
         """
         :param interceptor: A function that takes a url and returns True when
             it needs to be blocked. When interceptor is None, it is disabled.
@@ -186,7 +191,7 @@ class WebDriver:
         self._interceptor.interceptor = interceptor
         self._profile.setUrlRequestInterceptor(self._interceptor)
 
-    def get(self, url:str) -> None:
+    def get(self, url: str) -> None:
         """Open a url"""
         self.log(_LOG_CAT, 'load:', url)
         self._page.setUrl(url)
@@ -194,13 +199,13 @@ class WebDriver:
         self.log(_LOG_CAT, 'loaded')
         return self._result
 
-    def sleep_ms(self, ms:int) -> None:
+    def sleep_ms(self, ms: int) -> None:
         """Wait ms milliseconds"""
         self.log(_LOG_CAT, 'sleep:', ms)
         self._timer.start(ms)
         self._event_loop.exec_()
 
-    def download(self, url:str, filename:str=None, with_progression:bool=False) -> None:
+    def download(self, url: str, filename: str = '', with_progression: bool = False) -> None:
         """Download a url
         :param with_progression: When True, progression is sent to logger
         """
@@ -209,7 +214,7 @@ class WebDriver:
         self._page.download(url, filename)
         self._event_loop.exec_()
 
-    def execute_script(self, script:str, raise_if_js_error:bool=True):
+    def execute_script(self, script: str, raise_if_js_error: bool = True):
         """Execute a javascript code.
 
         The javascript code can return a value with return which must be
@@ -248,8 +253,8 @@ class WebDriver:
         """Get last javascript error."""
         return self._last_js_error or ''
 
-    def grab(self, x:int=0, y:int=0, w:int=-1, h:int=-1,
-             frozen_after_ms:int=0, max_iter:int=10) -> QImage:
+    def grab(self, x: int = 0, y: int = 0, w: int = -1, h: int = -1,
+             frozen_after_ms: int = 0, max_iter: int = 10) -> QImage:
         """Get a QImage of the page.
 
         If the image area is larger than the page, it is automatically truncated.
@@ -292,7 +297,6 @@ class WebDriver:
                     view.setAttribute(Qt.WA_DontShowOnScreen)
                     self._headless_view = view
 
-
             # no scroll when page_height == h
             view_width = page_width if page_height == h else self._view.size().width()
             view.resize(view_width, h)
@@ -334,10 +338,10 @@ class WebDriver:
 
         return img1
 
-    def take_screenshot(self, filename:str, format:Optional[str]=None,
-                        quality:int=-1,
-                        x:int=0, y:int=0, w:int=-1, h:int=-1,
-                        frozen_after_ms:int=0, max_iter:int=10) -> bool:
+    def take_screenshot(self, filename: str, format: Optional[bytes] = None,
+                        quality: int = -1,
+                        x: int = 0, y: int = 0, w: int = -1, h: int = -1,
+                        frozen_after_ms: int = 0, max_iter: int = 10) -> bool:
         """Screenshot the page.
 
         See self.grab()
@@ -346,7 +350,7 @@ class WebDriver:
         img = self.grab(x, y, w, h, frozen_after_ms, max_iter)
         return img.save(filename, format, quality)
 
-    def resize(self, width:int=-1, height:int=-1) -> None:
+    def resize(self, width: int = -1, height: int = -1) -> None:
         """Resize view
 
         A negative value for width or height means contents size width/height.
@@ -354,21 +358,23 @@ class WebDriver:
         self.log(_LOG_CAT, 'resize:', width, height)
         if width <= 0 or height <= 0:
             size = self._page.contentsSize().toSize()
-            if width <= 0: width = size.width()
-            if height <= 0: height = size.height()
+            if width <= 0:
+                width = size.width()
+            if height <= 0:
+                height = size.height()
             self.log(_LOG_CAT, 'resize(computed):', width, height)
         self._view.resize(width, height)
 
-    def contents_size(self) -> tuple[int,int]:
+    def contents_size(self) -> tuple[int, int]:
         """Get contents size"""
         size = self._page.contentsSize().toSize()
         return (size.width(), size.height())
 
-    def scroll(self, x:int, y:int) -> None:
+    def scroll(self, x: int, y: int) -> None:
         """Scroll at position"""
         self.execute_script(f'window.scroll({x},{y})')
 
-    def enable_devtools(self, enable:bool=True) -> None:
+    def enable_devtools(self, enable: bool = True) -> None:
         """Enable or disable devtools"""
         if bool(self._dev_view) == enable:
             return
@@ -390,7 +396,7 @@ class WebDriver:
         self._result = result
         self._event_loop.exit()
 
-    def _download_request(self, item:QWebEngineDownloadItem):
+    def _download_request(self, item: QWebEngineDownloadItem):
         # TODO check url origin
         self._download_item = item
         item.finished.connect(self._download_finished)
@@ -418,12 +424,14 @@ class WebDriver:
     def __exit__(self, type, value, traceback):
         self.quit()
 
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('requires a url', file=sys.stderr)
         exit(1)
 
     app = AppDriver(headless=False, logger=True)
+
     def run(driver: WebDriver):
-      driver.get(sys.argv[1])
+        driver.get(sys.argv[1])
     exit(app.run(run))

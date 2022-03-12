@@ -4,7 +4,7 @@ import multiprocessing
 import signal
 import threading
 import traceback
-from typing import Union, Optional, Iterable
+from typing import Union, Optional, Iterable, Callable
 
 from PySide2.QtCore import (QObject,
                             Slot,
@@ -23,8 +23,10 @@ _LOG_CAT = '\x1b[34m[idriver]\x1b[0m'
 _null_fn = webdriver._null_fn
 _strerr_print = webdriver._strerr_print
 
-def _select_logger(enable:bool):
+
+def _select_logger(enable: bool):
     return _strerr_print if enable else _null_fn
+
 
 """
 code.interact() must be running in the main process for autocomplete to work.
@@ -75,11 +77,12 @@ python interpreter.
                  └─────────────────────────────┘
 """
 
+
 class _MessageWorker(QThread):
     received = Signal()
     alive = True
 
-    def __init__(self, driver_chann:multiprocessing.Pipe, p=None):
+    def __init__(self, driver_chann: multiprocessing.Pipe, p=None):
         super().__init__(p)
         self.driver_chann = driver_chann
 
@@ -90,6 +93,7 @@ class _MessageWorker(QThread):
         while self.alive:
             self.data = chann.recv()
             emit()
+
 
 class _Synchronizer(QObject):
     def __init__(self, app, driver_chann, interceptor_chann, logger):
@@ -122,7 +126,7 @@ class _Synchronizer(QObject):
                 self.driver_chann.send((True, None))
             elif method == 'grab':
                 args = self.driver_messager.data[1]
-                img:QImage = getattr(self.driver, method)(*args)
+                img: QImage = getattr(self.driver, method)(*args)
                 bits = img.constBits().tobytes()
                 format = img.format()
                 bytesPerLine = img.bytesPerLine()
@@ -142,8 +146,10 @@ class _Synchronizer(QObject):
         self.interceptor_chann.send(url)
         return self.interceptor_chann.recv()
 
+
 def _default_interceptor(url):
     return False
+
 
 class _Interceptor:
     interceptor = _default_interceptor
@@ -161,6 +167,7 @@ class _Interceptor:
                 r = False
             chann.send(r)
         chann.close()
+
 
 class _InteractiveWebDriver:
     """Interactive WebDriver.
@@ -192,7 +199,7 @@ class _InteractiveWebDriver:
             self._interceptor_chann.close()
             self._driver_chann = None
 
-    def set_url_request_interceptor(self, interceptor:Optional[callable]) -> None:
+    def set_url_request_interceptor(self, interceptor: Optional[Callable[str], bool]) -> None:
         if not self._interceptor_thread:
             self._interceptor_thread = threading.Thread(target=self._interceptor.run)
             self._interceptor_thread.daemon = True
@@ -200,16 +207,16 @@ class _InteractiveWebDriver:
         self._interceptor.interceptor = interceptor or _default_interceptor
         self._exec('interceptor', bool(interceptor))
 
-    def get(self, url:str) -> None:
+    def get(self, url: str) -> None:
         return self._exec('get', (url,))
 
-    def sleep_ms(self, ms:int) -> None:
+    def sleep_ms(self, ms: int) -> None:
         return self._exec('sleep_ms', (ms,))
 
-    def download(self, url:str, filename:str=None, with_progression:bool=True) -> None:
+    def download(self, url: str, filename: str = None, with_progression: bool = True) -> None:
         return self._exec('download', (url, filename, with_progression,))
 
-    def execute_script(self, script:str, raise_if_js_error:bool=True):
+    def execute_script(self, script: str, raise_if_js_error: bool = True):
         res = self._exec('execute_script', (script, False,))
         if raise_if_js_error:
             error = self.get_last_js_error()
@@ -221,27 +228,27 @@ class _InteractiveWebDriver:
         return self._exec('get_last_js_error', ())
 
     def grab(self, x=0, y=0, w=-1, h=-1, frozen_after_ms=0, max_iter=10) -> QImage:
-        d = self._exec('grab', (x,y,w,h,frozen_after_ms,max_iter,))
+        d = self._exec('grab', (x, y, w, h, frozen_after_ms, max_iter,))
         # copy for detached buffer
         img = QImage(d[0], d[1], d[2], d[3], QImage.Format(d[4]))
         img.convertTo(QImage.Format_RGB32)
         return img
 
-    def take_screenshot(self, filename:str, format:Optional[str]=None, quality:int=-1,
+    def take_screenshot(self, filename: str, format: Optional[str] = None, quality: int = -1,
                         x=0, y=0, w=-1, h=-1, frozen_after_ms=0, max_iter=10) -> bool:
         return self._exec('take_screenshot', (filename, format, quality,
                                               x, y, w, h, frozen_after_ms, max_iter))
 
-    def resize(self, width:int=-1, height:int=-1) -> None:
+    def resize(self, width: int = -1, height: int = -1) -> None:
         return self._exec('resize', (width, height,))
 
-    def contents_size(self) -> tuple[int,int]:
+    def contents_size(self) -> tuple[int, int]:
         return self._exec('contents_size')
 
-    def scroll(self, x:int, y:int) -> None:
-        return self._exec('scroll', (x,y,))
+    def scroll(self, x: int, y: int) -> None:
+        return self._exec('scroll', (x, y,))
 
-    def enable_devtools(self, enable:bool=True) -> None:
+    def enable_devtools(self, enable: bool = True) -> None:
         return self._exec('enable_devtools', (enable,))
 
     def _exec(self, mem, data=()):
@@ -276,6 +283,7 @@ class _InteractiveWebDriver:
 
         raise class_(*res[2])
 
+
 def _webdriver_process(driver_chann, interceptor_chann, debug, idebug):
     # ignore Ctrl+C
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -285,8 +293,9 @@ def _webdriver_process(driver_chann, interceptor_chann, debug, idebug):
                          _select_logger(idebug))
     app.exec_()
 
+
 class AppDriver:
-    def __init__(self, debug:bool=False, idebug:bool=False):
+    def __init__(self, debug: bool = False, idebug: bool = False):
         driver_chann1, driver_chann2 = multiprocessing.Pipe()
         interceptor_chann1, interceptor_chann2 = multiprocessing.Pipe()
         self.p = multiprocessing.Process(target=_webdriver_process,
@@ -299,7 +308,7 @@ class AppDriver:
                                             _select_logger(idebug))
         atexit.register(lambda: self.quit())
 
-    def run(self, f:callable) -> int:
+    def run(self, f: Callable[[webdriver.WebDriver], None]) -> int:
         try:
             f(self.driver)
             return 0
@@ -329,15 +338,14 @@ if __name__ == '__main__':
         history_file = 'webdriver_history'
         parser = argparse.ArgumentParser(
             formatter_class=argparse.RawDescriptionHelpFormatter,
-            description='Interactive web driver that starts with predefined variables:\n' \
-                        '- d and driver as WebDriver\n' \
+            description='Interactive web driver that starts with predefined variables:\n'
+                        '- d and driver as WebDriver\n'
                         '- app like AppDriver')
         parser.add_argument('--debug', metavar='N', type=int, nargs='?', default=0,
                             help='0 = none, 1 = webdriver, 2 = interactive_webdriver, 3 = both')
         parser.add_argument('--history-file', metavar='PATH', type=str,
                             default=history_file, help=f'default: {history_file}')
         parser.add_argument('url', metavar='URL', type=str, nargs='?')
-
 
         args = parser.parse_args()
 
@@ -351,7 +359,7 @@ if __name__ == '__main__':
             except FileNotFoundError as e:
                 pass
 
-        debug = args.debug if args.debug else (3 if args.debug == None else 0)
+        debug = args.debug if args.debug else (3 if args.debug is None else 0)
         app = AppDriver(debug & 1, debug & 2)
 
         if args.url:
