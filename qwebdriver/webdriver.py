@@ -417,3 +417,13 @@ class WebDriver:
 
     def __exit__(self, type, value, traceback):
         self.quit()
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        print('requires a url', file=sys.stderr)
+        exit(1)
+
+    app = AppDriver(headless=False, logger=True)
+    def run(driver: WebDriver):
+      driver.get(sys.argv[1])
+    exit(app.run(run))
