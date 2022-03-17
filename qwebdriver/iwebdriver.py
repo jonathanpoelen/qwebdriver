@@ -199,7 +199,7 @@ class _InteractiveWebDriver:
             self._interceptor_chann.close()
             self._driver_chann = None
 
-    def set_url_request_interceptor(self, interceptor: Optional[Callable[str], bool]) -> None:
+    def set_url_request_interceptor(self, interceptor: Optional[Callable[[str], bool]]) -> None:
         if not self._interceptor_thread:
             self._interceptor_thread = threading.Thread(target=self._interceptor.run)
             self._interceptor_thread.daemon = True
