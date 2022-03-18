@@ -5,17 +5,15 @@ import signal
 import threading
 import traceback
 from typing import Union, Optional, Iterable, Callable
-
-from PySide2.QtCore import (QObject,
+from PySide6.QtCore import (QObject,
                             Slot,
                             Signal,
                             QThread,
                             SIGNAL,
                             SLOT,
                             Qt)
-from PySide2.QtGui import QImage
-
-from qwebdriver import webdriver
+from PySide6.QtGui import QImage
+from . import webdriver
 
 
 _LOG_CAT = '\x1b[34m[idriver]\x1b[0m'
@@ -163,7 +161,7 @@ class _Interceptor:
             try:
                 r = self.interceptor(url)
             except:
-                traceback.print_exc()
+                traceback.print_exc(file=sys.stderr)
                 r = False
             chann.send(r)
         chann.close()
@@ -291,7 +289,7 @@ def _webdriver_process(driver_chann, interceptor_chann, debug, idebug):
     app = webdriver.AppDriver(headless=False, logger=debug)
     sync = _Synchronizer(app, driver_chann, interceptor_chann,
                          _select_logger(idebug))
-    app.exec_()
+    app.exec()
 
 
 class AppDriver:

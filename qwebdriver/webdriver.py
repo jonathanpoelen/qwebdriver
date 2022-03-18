@@ -1,22 +1,21 @@
 import sys
 import json
 from typing import Union, Optional, Callable
-
-from PySide2.QtWebEngineCore import QWebEngineUrlRequestInterceptor
-from PySide2.QtWebEngineWidgets import (QWebEngineDownloadItem,
-                                        QWebEngineSettings,
-                                        QWebEngineProfile,
-                                        QWebEngineView,
-                                        QWebEnginePage)
-from PySide2.QtCore import (QCoreApplication,
+from PySide6.QtWebEngineCore import (QWebEngineUrlRequestInterceptor,
+                                     QWebEngineDownloadRequest,
+                                     QWebEngineSettings,
+                                     QWebEngineProfile,
+                                     QWebEnginePage)
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtCore import (QCoreApplication,
                             QUrl,
                             QRect,
                             Qt,
                             Slot,
                             QTimer,
                             QEventLoop)
-from PySide2.QtWidgets import QApplication, QShortcut
-from PySide2.QtGui import QImage
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import (QImage, QShortcut)
 
 
 _LOG_CAT = '\x1b[33m[driver]\x1b[0m'
@@ -87,7 +86,7 @@ class AppDriver:
         timer.timeout.connect(lambda: self._run(f))
         timer.setSingleShot(True)
         timer.start(0)
-        r = self._app.exec_()
+        r = self._app.exec()
         if self._excep:
             raise self._excep
         return r
@@ -100,8 +99,8 @@ class AppDriver:
         finally:
             self.quit()
 
-    def exec_(self) -> int:
-        return self._app.exec_()
+    def exec(self) -> int:
+        return self._app.exec()
 
     def quit(self) -> None:
         self.driver.quit()
@@ -144,7 +143,7 @@ class WebDriver:
 
         self._interceptor = _UrlRequestInterceptor(self.log)
 
-        # use with execute_script for function results
+        # used with execute_script for function results
         self._json_decode = json.JSONDecoder().decode
 
         self._view = QWebEngineView()
@@ -167,6 +166,12 @@ class WebDriver:
 
             devtool_act = QShortcut("F12", self._view)
             devtool_act.activated.connect(self._toggle_devtools)
+
+    def wait_quit(self):
+        if not self._headless:
+            event_loop = QEventLoop()
+            self._view.destroyed.connect(event_loop.exit)
+            event_loop.exec()
 
     def quit(self) -> None:
         if not self._page:
@@ -195,7 +200,7 @@ class WebDriver:
         """Open a url"""
         self.log(_LOG_CAT, 'load:', url)
         self._page.setUrl(url)
-        self._event_loop.exec_()
+        self._event_loop.exec()
         self.log(_LOG_CAT, 'loaded')
         return self._result
 
@@ -203,7 +208,7 @@ class WebDriver:
         """Wait ms milliseconds"""
         self.log(_LOG_CAT, 'sleep:', ms)
         self._timer.start(ms)
-        self._event_loop.exec_()
+        self._event_loop.exec()
 
     def download(self, url: str, filename: str = '', with_progression: bool = False) -> None:
         """Download a url
@@ -212,7 +217,7 @@ class WebDriver:
         self.log(_LOG_CAT, 'download:', url, 'to filename', filename)
         self._with_progression = with_progression and self.log != _null_fn
         self._page.download(url, filename)
-        self._event_loop.exec_()
+        self._event_loop.exec()
 
     def execute_script(self, script: str, raise_if_js_error: bool = True):
         """Execute a javascript code.
@@ -233,7 +238,7 @@ class WebDriver:
         self._page.js_error = None
         self._page.js_trace = True
         self._page.runJavaScript(script, 0, self._event_result)
-        self._event_loop.exec_()
+        self._event_loop.exec()
         self._page.js_trace = False
 
         self._last_js_error = self._page.js_error
@@ -396,10 +401,10 @@ class WebDriver:
         self._result = result
         self._event_loop.exit()
 
-    def _download_request(self, item: QWebEngineDownloadItem):
+    def _download_request(self, item: QWebEngineDownloadRequest):
         # TODO check url origin
         self._download_item = item
-        item.finished.connect(self._download_finished)
+        item.isFinishedChanged.connect(self._download_finished)
         if self._with_progression:
             item.downloadProgress.connect(self._download_progress)
         item.accept()
@@ -408,7 +413,7 @@ class WebDriver:
         self.log(_LOG_CAT, 'download, done')
         state = self._download_item.state()
         self._result = True
-        if state == QWebEngineDownloadItem.DownloadCompleted:
+        if state == QWebEngineDownloadRequest.DownloadCompleted:
             self._result = False
         else:
             self.log(_LOG_CAT, self._download_item.interruptReasonString())
@@ -434,4 +439,5 @@ if __name__ == '__main__':
 
     def run(driver: WebDriver):
         driver.get(sys.argv[1])
+        driver.wait_quit()
     exit(app.run(run))
