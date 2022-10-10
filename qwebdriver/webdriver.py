@@ -11,7 +11,6 @@ from PySide6.QtCore import (QCoreApplication,
                             QUrl,
                             QRect,
                             Qt,
-                            Slot,
                             QTimer,
                             QEventLoop)
 from PySide6.QtWidgets import QApplication
@@ -273,7 +272,7 @@ class WebDriver:
         self.log(_LOG_CAT, 'grab:', (x, y, w, h), 'delay:', frozen_after_ms, 'max_iter:', max_iter)
 
         page_width, page_height, scroll_top, screen_h, scroll_left = self.execute_script(
-            f'''
+            '''
             e = document.documentElement;
             return [e.scrollWidth, e.scrollHeight, e.scrollTop, e.clientHeight, window.scrollX];''')
         # shrink w/h compared to page_width/page_height

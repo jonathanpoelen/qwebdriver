@@ -1,17 +1,17 @@
+import sys
 import atexit
 import importlib
 import multiprocessing
 import signal
 import threading
 import traceback
-from typing import Union, Optional, Iterable, Callable
+from typing import Optional, Callable
 from PySide6.QtCore import (QObject,
                             Slot,
                             Signal,
                             QThread,
                             SIGNAL,
-                            SLOT,
-                            Qt)
+                            SLOT)
 from PySide6.QtGui import QImage
 from . import webdriver
 
@@ -87,7 +87,6 @@ class _MessageWorker(QThread):
     def run(self):
         chann = self.driver_chann
         emit = self.received.emit
-        method = None
         while self.alive:
             self.data = chann.recv()
             emit()
@@ -160,7 +159,7 @@ class _Interceptor:
         while url := chann.recv():
             try:
                 r = self.interceptor(url)
-            except:
+            except:  # noqa: E722
                 traceback.print_exc(file=sys.stderr)
                 r = False
             chann.send(r)
@@ -287,7 +286,7 @@ def _webdriver_process(driver_chann, interceptor_chann, debug, idebug):
     signal.signal(signal.SIGINT, signal.SIG_IGN)
 
     app = webdriver.AppDriver(headless=False, logger=debug)
-    sync = _Synchronizer(app, driver_chann, interceptor_chann,
+    sync = _Synchronizer(app, driver_chann, interceptor_chann,  # noqa: F841
                          _select_logger(idebug))
     app.exec()
 
@@ -326,7 +325,7 @@ class AppDriver:
 
 
 if __name__ == '__main__':
-    import rlcompleter
+    import rlcompleter  # noqa: F401
     import readline
     import code
     import argparse
@@ -354,7 +353,7 @@ if __name__ == '__main__':
         if history_file:
             try:
                 readline.read_history_file(history_file)
-            except FileNotFoundError as e:
+            except FileNotFoundError:
                 pass
 
         debug = args.debug if args.debug else (3 if args.debug is None else 0)
