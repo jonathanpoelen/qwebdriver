@@ -10,9 +10,7 @@ from multiprocessing.connection import Connection
 from PySide6.QtCore import (QObject,
                             Slot,
                             Signal,
-                            QThread,
-                            SIGNAL,
-                            SLOT)
+                            QThread)
 from PySide6.QtGui import QImage
 from . import webdriver
 
@@ -102,7 +100,7 @@ class _Synchronizer(QObject):
         self.driver_chann = driver_chann
         self.interceptor_chann = interceptor_chann
         self.driver_messager = _MessageWorker(driver_chann, self.app._app)
-        QObject.connect(self.driver_messager, SIGNAL('received()'), self, SLOT('_sync_driver()'))
+        self.driver_messager.received.connect(self._sync_driver)
         self.driver_messager.start()
 
     @Slot()
