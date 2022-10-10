@@ -1,6 +1,6 @@
 import sys
 import json
-from typing import Union, Optional, Callable
+from typing import Any, Union, Optional, Callable
 from PySide6.QtWebEngineCore import (QWebEngineUrlRequestInterceptor,
                                      QWebEngineDownloadRequest,
                                      QWebEngineSettings,
@@ -41,7 +41,7 @@ class _UrlRequestInterceptor(QWebEngineUrlRequestInterceptor):
 class _WebPage(QWebEnginePage):
     """Wrapper to control javascript errors and console messages"""
 
-    js_error = None
+    js_error: Optional[str] = None
     js_trace = False
 
     def javaScriptConsoleMessage(self, level, message, lineNumber, sourceID):
@@ -69,7 +69,7 @@ def _strerr_print(*args):
 
 class AppDriver:
     """QApplication + WebDriver"""
-    _excep = None
+    _excep: Optional[Exception] = None
 
     def __init__(self, headless: bool = True, logger: bool = False):
         QCoreApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
@@ -113,11 +113,10 @@ class AppDriver:
 
 
 class WebDriver:
-    _result = None
-    _view = None
-    _last_js_error = None
-    _dev_view = None
-    _headless_view = None
+    _result: Any = None
+    _last_js_error: Optional[str] = None
+    _dev_view: Optional[QWebEngineView] = None
+    _headless_view: Optional[QWebEngineView] = None
 
     def __init__(self, headless: bool = True, logger: Union[Callable[..., None], bool, None] = False):
         if logger is True:
@@ -151,6 +150,8 @@ class WebDriver:
         self._view.setAttribute(Qt.WA_NoSystemBackground)
         self._view.show()
 
+        self._closed = False
+
         if headless:
             # Wide screen so that a maximum of things is visible in width
             self._view.resize(4096, 8192)
@@ -173,8 +174,10 @@ class WebDriver:
             event_loop.exec()
 
     def quit(self) -> None:
-        if not self._page:
+        if self._closed:
             return
+
+        self._closed = True
 
         if self._view:
             self._view.deleteLater()
@@ -184,7 +187,6 @@ class WebDriver:
             self._headless_view.deleteLater()
         self._page.deleteLater()
         self._profile.deleteLater()
-        self._page = None
 
     def set_url_request_interceptor(self, interceptor: Optional[Callable[[str], bool]]) -> None:
         """
@@ -380,15 +382,13 @@ class WebDriver:
 
     def enable_devtools(self, enable: bool = True) -> None:
         """Enable or disable devtools"""
-        if bool(self._dev_view) == enable:
-            return
-
         if enable:
-            self._dev_view = QWebEngineView()
-            page = self._dev_view.page()
-            self._page.setDevToolsPage(page)
-            self._dev_view.show()
-        else:
+            if not self._dev_view:
+                self._dev_view = QWebEngineView()
+                page = self._dev_view.page()
+                self._page.setDevToolsPage(page)
+                self._dev_view.show()
+        elif self._dev_view:
             self._dev_view.deleteLater()
             self._dev_view = None
             self._page.setDevToolsPage(None)

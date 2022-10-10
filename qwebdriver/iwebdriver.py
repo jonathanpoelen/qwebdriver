@@ -6,6 +6,7 @@ import signal
 import threading
 import traceback
 from typing import Optional, Callable
+from multiprocessing.connection import Connection
 from PySide6.QtCore import (QObject,
                             Slot,
                             Signal,
@@ -78,11 +79,11 @@ python interpreter.
 
 class _MessageWorker(QThread):
     received = Signal()
-    alive = True
 
-    def __init__(self, driver_chann: multiprocessing.Pipe, p=None):
+    def __init__(self, driver_chann: Connection, p=None):
         super().__init__(p)
         self.driver_chann = driver_chann
+        self.alive = True
 
     def run(self):
         chann = self.driver_chann
@@ -93,7 +94,7 @@ class _MessageWorker(QThread):
 
 
 class _Synchronizer(QObject):
-    def __init__(self, app, driver_chann, interceptor_chann, logger):
+    def __init__(self, app, driver_chann: Connection, interceptor_chann: Connection, logger):
         super().__init__()
         self.app = app
         self.log = logger
@@ -172,11 +173,11 @@ class _InteractiveWebDriver:
     The API is strictly identical to WebDriver.
     """
 
-    _interceptor_thread = None
-    _depth = 0
+    _interceptor_thread: Optional[threading.Thread] = None
 
     def __init__(self, driver_chann, interceptor_chann, interceptor_chann_recv, logger):
         self.log = logger
+        self._depth = 0
         self._driver_chann = driver_chann
         self._interceptor_chann = interceptor_chann
         self._interceptor_chann_recv = interceptor_chann_recv
