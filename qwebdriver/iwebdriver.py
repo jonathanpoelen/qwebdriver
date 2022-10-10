@@ -371,6 +371,8 @@ if __name__ == '__main__':
     driver = app.driver
     d = driver
 
+    print('\x1b[33mdriver is nammed `driver` with `d` as alias\x1b[m')
+
     code.interact(local=globals())
 
     if history_file:
