@@ -117,6 +117,7 @@ class WebDriver:
     _last_js_error: Optional[str] = None
     _dev_view: Optional[QWebEngineView] = None
     _headless_view: Optional[QWebEngineView] = None
+    _progress_timer: Optional[QTimer] = None
 
     def __init__(self, headless: bool = True, logger: Union[Callable[..., None], bool, None] = False):
         if logger is True:
@@ -405,8 +406,14 @@ class WebDriver:
         self._download_item = item
         item.isFinishedChanged.connect(self._download_finished)
         if self._with_progression:
-            item.downloadProgress.connect(self._download_progress)
+            if not self._progress_timer:
+                self._progress_timer = QTimer()
+                self._progress_timer.timeout.connect(
+                    lambda: self.log(_LOG_CAT, f'download {item.receivedBytes()}/{item.totalBytes()}'))
+            self._progress_timer.start(1000)
         item.accept()
+        filename = f'{item.downloadDirectory()}/{item.downloadFileName()}'
+        self.log(_LOG_CAT, f'download to {filename}')
 
     def _download_finished(self):
         self.log(_LOG_CAT, 'download, done')
@@ -416,11 +423,10 @@ class WebDriver:
             self._result = False
         else:
             self.log(_LOG_CAT, self._download_item.interruptReasonString())
+        if self._progress_timer:
+            self._progress_timer.stop()
         self._download_item = None
         self._event_loop.exit()
-
-    def _download_progress(self, bytesReceived, bytesTotal):
-        self.log(_LOG_CAT, f'download {bytesReceived}/{bytesTotal}')
 
     def __enter__(self):
         return self
