@@ -12,9 +12,11 @@ from PySide6.QtCore import (QCoreApplication,
                             QRect,
                             Qt,
                             QTimer,
+                            QPoint,
+                            QEvent,
                             QEventLoop)
-from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import (QImage, QShortcut)
+from PySide6.QtWidgets import (QApplication, QWidget)
+from PySide6.QtGui import (QImage, QShortcut, QMouseEvent)
 
 
 _LOG_CAT = '\x1b[33m[driver]\x1b[0m'
@@ -81,10 +83,7 @@ class AppDriver:
         """
         Call f(driver) then use quit()
         """
-        timer = QTimer()
-        timer.timeout.connect(lambda: self._run(f))
-        timer.setSingleShot(True)
-        timer.start(0)
+        QTimer.singleShot(0, lambda: self._run(f))
         r = self._app.exec()
         if self._excep:
             raise self._excep
@@ -110,6 +109,14 @@ class AppDriver:
 
     def __exit__(self, type, value, traceback):
         self.quit()
+
+
+def _left_click(widget: QWidget, event: QEvent.Type, pos: QPoint) -> None:
+    QCoreApplication.postEvent(widget,
+                               QMouseEvent(event, pos,
+                                           Qt.LeftButton,
+                                           Qt.MouseButton.NoButton,
+                                           Qt.NoModifier))
 
 
 class WebDriver:
@@ -157,8 +164,9 @@ class WebDriver:
             # Wide screen so that a maximum of things is visible in width
             self._view.resize(4096, 8192)
             self._page.settings().setAttribute(QWebEngineSettings.ShowScrollBars, False)
-            self._view.setAttribute(Qt.WA_Disabled)
+            self._view.setAttribute(Qt.WA_ForceDisabled)
             self._view.setAttribute(Qt.WA_DontShowOnScreen)
+            self._view.setAttribute(Qt.WA_ForceUpdatesDisabled)
         else:
             self._view.resize(1024, 750)
 
@@ -380,6 +388,20 @@ class WebDriver:
     def scroll(self, x: int, y: int) -> None:
         """Scroll at position"""
         self.execute_script(f'window.scroll({x},{y})')
+
+    def click(self, x: int, y: int, delay_ms: int = 100) -> None:
+        """Click at position"""
+        for widget in self._view.children():
+            if widget.isWidgetType():
+                break
+        pos = QPoint(x, y)
+        if self._headless:
+            # restore mouse event
+            self._view.setAttribute(Qt.WA_ForceDisabled, False)
+        _left_click(widget, QEvent.MouseButtonPress, pos)
+        QTimer.singleShot(delay_ms, lambda: _left_click(widget, QEvent.MouseButtonRelease, pos))
+        if self._headless:
+            self._view.setAttribute(Qt.WA_ForceDisabled)
 
     def enable_devtools(self, enable: bool = True) -> None:
         """Enable or disable devtools"""
