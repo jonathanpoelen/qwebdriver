@@ -394,12 +394,16 @@ class WebDriver:
         for widget in self._view.children():
             if widget.isWidgetType():
                 break
+
         pos = QPoint(x, y)
         if self._headless:
             # restore mouse event
             self._view.setAttribute(Qt.WA_ForceDisabled, False)
+
         _left_click(widget, QEvent.MouseButtonPress, pos)
-        QTimer.singleShot(delay_ms, lambda: _left_click(widget, QEvent.MouseButtonRelease, pos))
+        self.sleep_ms(delay_ms)
+        _left_click(widget, QEvent.MouseButtonRelease, pos)
+
         if self._headless:
             self._view.setAttribute(Qt.WA_ForceDisabled)
 

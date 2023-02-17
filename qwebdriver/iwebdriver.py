@@ -246,7 +246,6 @@ class _InteractiveWebDriver:
 
     def click(self, x: int, y: int, delay_ms: int = 100) -> None:
         self._exec('click', (x, y, delay_ms,))
-        self.sleep_ms(delay_ms + 20)
 
     def enable_devtools(self, enable: bool = True) -> None:
         return self._exec('enable_devtools', (enable,))
