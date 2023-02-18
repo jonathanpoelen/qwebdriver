@@ -58,6 +58,10 @@ class JsException(Exception):
     pass
 
 
+class DownloadException(Exception):
+    pass
+
+
 def _null_fn(*args):
     """A function that does nothing (used when logger is None)"""
     pass
@@ -226,8 +230,11 @@ class WebDriver:
         """
         self.log(_LOG_CAT, 'download:', url, 'to filename', filename)
         self._with_progression = with_progression and self.log != _null_fn
+        self._result = None
         self._page.download(url, filename)
         self._event_loop.exec()
+        if self._result:
+            raise self._result
 
     def execute_script(self, script: str, raise_if_js_error: bool = True):
         """Execute a javascript code.
@@ -442,15 +449,25 @@ class WebDriver:
         self.log(_LOG_CAT, f'download to {filename}')
 
     def _download_finished(self):
-        self.log(_LOG_CAT, 'download, done')
-        state = self._download_item.state()
-        self._result = True
-        if state == QWebEngineDownloadRequest.DownloadCompleted:
-            self._result = False
-        else:
-            self.log(_LOG_CAT, self._download_item.interruptReasonString())
+        try:
+            state = self._download_item.state()
+            if state == QWebEngineDownloadRequest.DownloadCompleted:
+                self.log(_LOG_CAT, 'download, done')
+            elif state == QWebEngineDownloadRequest.DownloadInterrupted:
+                msg = self._download_item.interruptReasonString()
+                self.log(_LOG_CAT, msg)
+                self._result = DownloadException(msg)
+            elif state == QWebEngineDownloadRequest.DownloadCancelled:
+                self.log(_LOG_CAT, 'download, cancelled')
+            else:
+                # InProgress, do nothing
+                return
+        except BaseException as e:
+            self._result = e
+
         if self._progress_timer:
             self._progress_timer.stop()
+
         self._download_item = None
         self._event_loop.exit()
 
