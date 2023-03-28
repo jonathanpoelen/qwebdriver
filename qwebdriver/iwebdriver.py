@@ -209,6 +209,9 @@ class _InteractiveWebDriver:
     def sleep_ms(self, ms: int) -> None:
         return self._exec('sleep_ms', (ms,))
 
+    def save_page(self, filename: str) -> None:
+        return self._exec('save_page', (filename,))
+
     def download(self, url: str, filename: str = None, with_progression: bool = True) -> None:
         return self._exec('download', (url, filename, with_progression,))
 

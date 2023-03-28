@@ -129,6 +129,7 @@ class WebDriver:
     _dev_view: Optional[QWebEngineView] = None
     _headless_view: Optional[QWebEngineView] = None
     _progress_timer: Optional[QTimer] = None
+    _downloaded_filename: str = ''
 
     def __init__(self, headless: bool = True, logger: Union[Callable[..., None], bool, None] = False):
         if logger is True:
@@ -223,6 +224,14 @@ class WebDriver:
         self.log(_LOG_CAT, 'sleep:', ms)
         self._timer.start(ms)
         self._event_loop.exec()
+
+    def save_page(self, filename: str) -> None:
+        self._with_progression = False
+        self._downloaded_filename = filename
+        self._page.triggerAction(QWebEnginePage.SavePage)
+        self._event_loop.exec()
+        if self._result:
+            raise self._result
 
     def download(self, url: str, filename: str = '', with_progression: bool = False) -> None:
         """Download a url
@@ -444,6 +453,11 @@ class WebDriver:
                 self._progress_timer.timeout.connect(
                     lambda: self.log(_LOG_CAT, f'download {item.receivedBytes()}/{item.totalBytes()}'))
             self._progress_timer.start(1000)
+
+        if self._downloaded_filename:
+            item.setDownloadFileName(self._downloaded_filename)
+            self._downloaded_filename = ''
+
         item.accept()
         filename = f'{item.downloadDirectory()}/{item.downloadFileName()}'
         self.log(_LOG_CAT, f'download to {filename}')
