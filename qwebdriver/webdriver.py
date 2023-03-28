@@ -226,6 +226,7 @@ class WebDriver:
         self._event_loop.exec()
 
     def save_page(self, filename: str) -> None:
+        self._result = None
         self._with_progression = False
         self._downloaded_filename = filename
         self._page.triggerAction(QWebEnginePage.SavePage)
