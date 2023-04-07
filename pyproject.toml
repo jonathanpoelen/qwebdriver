@@ -1,3 +1,17 @@
+[project]
+name = "qwebdriver_jln"
+version = "1.0.0"
+description = "A simili webdriver with QWebEngine"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Jonathan Poelen", email = "jonathan.poelen@gmail.com" },
+]
+
+dependencies = [
+    "PySide2",
+]
+
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
