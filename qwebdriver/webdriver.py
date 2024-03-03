@@ -130,6 +130,7 @@ class WebDriver:
     _headless_view: Optional[QWebEngineView] = None
     _progress_timer: Optional[QTimer] = None
     _downloaded_filename: str = ''
+    _enable_exit_event_on_load_finished: bool = False
 
     def __init__(self, headless: bool = True, logger: Union[Callable[..., None], bool, None] = False):
         if logger is True:
@@ -158,7 +159,7 @@ class WebDriver:
         self._json_decode = json.JSONDecoder().decode
 
         self._view = QWebEngineView()
-        self._view.loadFinished.connect(self._event_result)
+        self._view.loadFinished.connect(self._event_load_finished)
         self._view.setPage(self._page)
         self._view.setAttribute(Qt.WA_NoSystemBackground)
         self._view.show()
@@ -214,10 +215,11 @@ class WebDriver:
     def get(self, url: str) -> None:
         """Open a url"""
         self.log(_LOG_CAT, 'load:', url)
+        self._enable_exit_event_on_load_finished = True
         self._page.setUrl(url)
         self._event_loop.exec()
+        self._enable_exit_event_on_load_finished = False
         self.log(_LOG_CAT, 'loaded')
-        return self._result
 
     def sleep_ms(self, ms: int) -> None:
         """Wait ms milliseconds"""
@@ -443,6 +445,10 @@ class WebDriver:
     def _event_result(self, result):
         self._result = result
         self._event_loop.exit()
+
+    def _event_load_finished(self, result):
+        if self._enable_exit_event_on_load_finished:
+            self._event_loop.exit()
 
     def _download_request(self, item: QWebEngineDownloadRequest):
         # TODO check url origin
