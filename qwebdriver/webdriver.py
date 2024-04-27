@@ -227,10 +227,15 @@ class WebDriver:
         self._timer.start(ms)
         self._event_loop.exec()
 
-    def save_page(self, filename: str) -> None:
+    def save_page(self, filename: str, format: int = 2) -> None:
         self._result = None
         self._with_progression = False
         self._downloaded_filename = filename
+        self._downloaded_format = (
+            QWebEngineDownloadRequest.SingleHtmlSaveFormat if format == 1 else
+            QWebEngineDownloadRequest.CompleteHtmlSaveFormat if format == 2 else
+            QWebEngineDownloadRequest.MimeHtmlSaveFormat
+        )
         self._page.triggerAction(QWebEnginePage.SavePage)
         self._event_loop.exec()
         if self._result:
@@ -463,6 +468,7 @@ class WebDriver:
 
         if self._downloaded_filename:
             item.setDownloadFileName(self._downloaded_filename)
+            item.setSavePageFormat(self._downloaded_format)
             self._downloaded_filename = ''
 
         item.accept()
